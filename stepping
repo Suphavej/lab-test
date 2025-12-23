@@ -1,0 +1,58 @@
+#include <AccelStepper.h>
+
+// --- กำหนดขา GPIO ของ ESP32 ที่เชื่อมต่อกับ ULN2003 ---
+const int MOTOR_PIN_1 = 16; // IN1
+const int MOTOR_PIN_2 = 17; // IN2
+const int MOTOR_PIN_3 = 18; // IN3
+const int MOTOR_PIN_4 = 19; // IN4
+
+// --- กำหนดค่าควบคุม ---
+const int STEPS_PER_REV = 2048; 
+const float MAX_SPEED_STEPS_PER_SEC = 200.0; 
+const float ACCELERATION = 100.0;           
+const long ROTATION_DURATION_MS = 5000;     
+
+// จำนวนสเต็ปที่มอเตอร์จะหมุนได้ใน 5 วินาที
+const long STEPS_TO_RUN = (long)(MAX_SPEED_STEPS_PER_SEC * (ROTATION_DURATION_MS / 1000.0)); 
+
+// สร้างวัตถุ AccelStepper 
+// ลำดับขาที่ใช้: IN1 (16), IN3 (18), IN2 (17), IN4 (19)
+// เนื่องจาก AccelStepper ต้องเรียงตามลำดับคอยล์
+AccelStepper stepper(AccelStepper::HALF4WIRE, MOTOR_PIN_1, MOTOR_PIN_3, MOTOR_PIN_2, MOTOR_PIN_4);
+
+// ตัวแปรสำหรับจับเวลาการสลับทิศทาง
+long lastSwitchTime = 0;
+bool isClockwise = true; 
+
+void setup() {
+  // 1. ตั้งค่าความเร็วและความเร่ง
+  stepper.setMaxSpeed(MAX_SPEED_STEPS_PER_SEC); 
+  stepper.setAcceleration(ACCELERATION);
+  
+  // 2. ตั้งเวลาเริ่มต้น
+  lastSwitchTime = millis();
+  
+  // 3. กำหนดเป้าหมายการหมุนเริ่มต้น: หมุนตามเข็ม
+  stepper.move(STEPS_TO_RUN);
+}
+
+void loop() {
+  stepper.run();
+
+  // ตรวจสอบว่าถึงเวลาต้องสลับทิศทางแล้วหรือยัง (5 วินาที)
+  if (millis() - lastSwitchTime >= ROTATION_DURATION_MS) {
+    
+    // สลับสถานะทิศทางการหมุน
+    isClockwise = !isClockwise;
+    
+    // กำหนดเป้าหมายการหมุนใหม่
+    if (isClockwise) {
+      stepper.move(STEPS_TO_RUN);
+    } else {
+      stepper.move(-STEPS_TO_RUN);
+    }
+    
+    // รีเซ็ตตัวจับเวลา
+    lastSwitchTime = millis();
+  }
+}
